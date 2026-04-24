@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>소득세 계산기 (연말정산 / 종합소득세)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Malgun Gothic', '맑은 고딕', AppleGothic, Arial, sans-serif;
+    font-size: 12px;
+    background: #eef2f7;
+    margin: 0;
+    padding: 16px;
+    color: #222;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid #b0bec5;
+    border-radius: 6px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  h1 { text-align: center; font-size: 15px; font-weight: bold; margin: 0 0 4px; color: #1a237e; }
+  .subtitle { text-align: center; font-size: 11px; color: #666; margin-bottom: 14px; }
+  .toolbar { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 12px; }
+  .btn { padding: 5px 14px; border: 1px solid #90a4ae; border-radius: 4px; background: #f5f5f5; cursor: pointer; font-size: 12px; font-family: inherit; color: #333; }
+  .btn:hover { background: #e0e0e0; }
+  .btn-primary { background: #1565c0; color: white; border-color: #0d47a1; }
+  .btn-primary:hover { background: #0d47a1; }
+
+  .section-title { background: #1565c0; color: #fff; padding: 5px 10px; font-weight: bold; margin: 16px 0 4px; font-size: 12px; border-radius: 2px; }
+  .sub-title { background: #bbdefb; color: #0d2a6e; padding: 4px 10px; font-weight: bold; margin: 8px 0 2px; font-size: 12px; border-left: 3px solid #1565c0; }
+  .hint { font-size: 10.5px; color: #b71c1c; background: #fff8e1; border: 1px solid #ffe082; padding: 3px 8px; margin-bottom: 3px; border-radius: 3px; }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 2px; font-size: 12px; }
+  th { background: #e3f2fd; border: 1px solid #90caf9; padding: 4px 6px; text-align: center; font-weight: bold; color: #1a237e; white-space: nowrap; }
+  td { border: 1px solid #b0bec5; padding: 3px 5px; text-align: center; vertical-align: middle; }
+  td.lbl  { text-align: left; background: #f3f7fc; white-space: nowrap; }
+  td.lbl2 { text-align: left; background: #f8fbff; padding-left: 14px; white-space: nowrap; }
+  td.lbl3 { text-align: left; background: #fcfeff; padding-left: 26px; white-space: nowrap; }
+  td.rate { text-align: center; background: #f1f8e9; color: #33691e; font-size: 11px; white-space: nowrap; }
+  td.auto { background: #e8f5e9; text-align: right; font-weight: bold; color: #1b5e20; white-space: nowrap; }
+  td.sum  { background: #fff8e1; text-align: right; font-weight: bold; color: #e65100; white-space: nowrap; }
+  td.unit-val { background: #f9fbe7; text-align: right; color: #555; white-space: nowrap; }
+  td.result-big { background: #e8f5e9; text-align: right; font-weight: bold; color: #1b5e20; font-size: 13px; }
+
+  input[type="number"] {
+    width: 100%; border: 1px solid #b0bec5; padding: 2px 5px;
+    text-align: right; font-size: 12px; font-family: inherit;
+    background: #fffde7; border-radius: 2px; outline: none;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"]:focus { border-color: #1565c0; background: #e8eaf6; }
+
+  .note { font-size: 10.5px; color: #777; margin-top: 14px; line-height: 1.7; border-top: 1px solid #e0e0e0; padding-top: 8px; }
+
+  /* ── 탭 ── */
+  .tab-nav { display: flex; gap: 3px; margin: 10px 0 0; border-bottom: 2px solid #1565c0; }
+  .tab-btn { padding: 7px 22px; background: #e3f2fd; border: 1px solid #90caf9; border-bottom: none; cursor: pointer; font-size: 13px; font-weight: bold; color: #1565c0; border-radius: 5px 5px 0 0; font-family: inherit; transition: background 0.15s; }
+  .tab-btn.active { background: #1565c0; color: #fff; border-color: #1565c0; }
+  .tab-btn:hover:not(.active) { background: #bbdefb; }
+  .tab-panel { display: none; padding-top: 14px; }
+  .tab-panel.active { display: block; }
+
+  /* ── 종합소득세 matrix 테이블 ── */
+  #cit-table td.dash { background: #f5f5f5; color: #bbb; text-align: center; }
+  #cit-table td.sep  { background: #fff3e0; text-align: right; font-weight: bold; color: #e65100; }
+  #cit-table td.final { background: #fce4ec; text-align: right; font-weight: bold; font-size: 13px; }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .container { border: none; box-shadow: none; padding: 8px; }
+    .toolbar, .hint { display: none; }
+    input[type="number"] { border: none; background: transparent; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>소득세 계산기</h1>
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('yts',this)">📋 연말정산</button>
+    <button class="tab-btn" onclick="switchTab('cit',this)">📊 종합소득세</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       탭 1: 연말정산
+  ══════════════════════════════════════════════════ -->
+  <div id="panel-yts" class="tab-panel active">
+  <div class="subtitle">2025년 귀속 근로소득 기준 (2026년 신고) ｜ 노란색 칸에 값을 입력하면 자동으로 계산됩니다</div>
+  <div class="toolbar">
+    <button class="btn" onclick="resetAll()">초기화</button>
+    <button class="btn btn-primary" onclick="window.print()">인쇄 / PDF 저장</button>
+  </div>
+
+  <!-- ======================== 소득현황 ======================== -->
+  <div class="section-title">[ 소득현황 ]</div>
+
+  <div class="sub-title">[ 근무처별 소득 ]</div>
+  <div class="hint">⚠ 총급여·상여는 <strong>비과세 금액이 포함된 총지급액</strong>을 입력하세요. 비과세 금액은 아래 표에 별도 입력하면 자동 차감됩니다.</div>
+  <table>
+    <colgroup><col style="width:22%"><col style="width:18%"><col style="width:18%"><col style="width:18%"><col style="width:24%"></colgroup>
+    <tr><th>구분</th><th>주(현)</th><th>종(전)</th><th>총(전)</th><th>합계</th></tr>
+    <tr>
+      <td class="lbl">총급여 (비과세 포함)</td>
+      <td><input type="number" id="s_main"  oninput="calc()" placeholder="0"></td>
+      <td><input type="number" id="s_prev1" oninput="calc()" placeholder="0"></td>
+      <td><input type="number" id="s_prev2" oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_salary_sum">0</td>
+    </tr>
+    <tr>
+      <td class="lbl">상여 (비과세 포함)</td>
+      <td><input type="number" id="b_main"  oninput="calc()" placeholder="0"></td>
+      <td><input type="number" id="b_prev1" oninput="calc()" placeholder="0"></td>
+      <td><input type="number" id="b_prev2" oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_bonus_sum">0</td>
+    </tr>
+    <tr>
+      <td class="lbl sum">합계 (비과세 포함)</td>
+      <td class="sum" id="o_col_main">0</td>
+      <td class="sum" id="o_col_prev1">0</td>
+      <td class="sum" id="o_col_prev2">0</td>
+      <td class="sum" id="o_income_grand">0</td>
+    </tr>
+  </table>
+
+  <div class="sub-title">[ 비과세 소득 ] — 위 총지급액 중 비과세 해당액 입력 → 자동 차감</div>
+  <table>
+    <colgroup><col style="width:30%"><col style="width:46%"><col style="width:24%"></colgroup>
+    <tr><th>구분</th><th>금액</th><th>합계</th></tr>
+    <tr><td class="lbl">연구활동비</td>      <td><input type="number" id="nt_research"  oninput="calc()" placeholder="0"></td><td class="auto" id="o_nt_research">0</td></tr>
+    <tr><td class="lbl">국외근로소득</td>    <td><input type="number" id="nt_overseas"  oninput="calc()" placeholder="0 (월 500만원 한도)"></td><td class="auto" id="o_nt_overseas">0</td></tr>
+    <tr><td class="lbl">야간근로수당</td>    <td><input type="number" id="nt_night"     oninput="calc()" placeholder="0"></td><td class="auto" id="o_nt_night">0</td></tr>
+    <tr><td class="lbl">출산보육수당</td>    <td><input type="number" id="nt_birth"     oninput="calc()" placeholder="0"></td><td class="auto" id="o_nt_birth">0</td></tr>
+    <tr><td class="lbl">외국인근로자</td>    <td><input type="number" id="nt_foreign"   oninput="calc()" placeholder="0"></td><td class="auto" id="o_nt_foreign">0</td></tr>
+    <tr><td class="lbl">직무발명보상금</td>  <td><input type="number" id="nt_invention" oninput="calc()" placeholder="0"></td><td class="auto" id="o_nt_invention">0</td></tr>
+    <tr><td class="lbl">식대비과세</td>      <td><input type="number" id="nt_meal"      oninput="calc()" placeholder="월 20만원 한도"></td><td class="auto" id="o_nt_meal">0</td></tr>
+    <tr><td class="lbl">기타비과세</td>      <td><input type="number" id="nt_other"     oninput="calc()" placeholder="0"></td><td class="auto" id="o_nt_other">0</td></tr>
+    <tr><td class="lbl sum">합계</td><td class="sum" id="o_nt_sub">0</td><td class="sum" id="o_nt_total">0</td></tr>
+  </table>
+
+  <!-- ======================== 연말정산 ======================== -->
+  <div class="section-title">[ 연말정산 ]</div>
+
+  <div class="sub-title">[ 근로소득 ]</div>
+  <table>
+    <colgroup><col style="width:52%"><col style="width:24%"><col style="width:24%"></colgroup>
+    <tr><th>구분</th><th>합계</th><th>총계</th></tr>
+    <tr>
+      <td class="lbl">총급여 = 근무처별소득합계 − 비과세소득합계</td>
+      <td class="auto" id="o_total_salary">0</td>
+      <td class="auto" id="o_total_salary2">0</td>
+    </tr>
+  </table>
+
+  <div class="sub-title">[ 근로소득공제 ]</div>
+  <table>
+    <colgroup><col style="width:52%"><col style="width:24%"><col style="width:24%"></colgroup>
+    <tr><th>구분</th><th>합계</th><th>총계</th></tr>
+    <tr><td class="lbl">근로소득공제 (자동 계산)</td><td class="auto" id="o_emp_ded">0</td><td class="auto" id="o_emp_ded2">0</td></tr>
+  </table>
+
+  <div class="sub-title">[ 근로소득금액 ]</div>
+  <table>
+    <colgroup><col style="width:52%"><col style="width:24%"><col style="width:24%"></colgroup>
+    <tr><th>구분</th><th>합계</th><th>총계</th></tr>
+    <tr><td class="lbl">근로소득금액 = 총급여 − 근로소득공제</td><td class="auto" id="o_emp_income">0</td><td class="auto" id="o_emp_income2">0</td></tr>
+  </table>
+
+  <!-- ======================== 소득공제 ======================== -->
+  <div class="sub-title">[ 소득공제 ]</div>
+  <table>
+    <colgroup>
+      <col style="width:10%"><col style="width:10%"><col style="width:14%">
+      <col style="width:8%"><col style="width:15%"><col style="width:15%"><col style="width:13%"><col style="width:15%">
+    </colgroup>
+    <tr>
+      <th>구분</th><th></th><th></th>
+      <th>단위</th><th>단위금액</th><th>납입/사용액</th><th>공제액</th><th>총계</th>
+    </tr>
+
+    <!-- 인적공제 -->
+    <tr>
+      <td class="lbl" rowspan="7">인적공제</td>
+      <td class="lbl2" rowspan="3">기본공제</td>
+      <td class="lbl3">본인공제</td>
+      <td><input type="number" id="p_self"     oninput="calc()" value="1" min="0" max="1"></td>
+      <td class="unit-val">1,500,000</td><td></td>
+      <td class="auto" id="o_p_self">0</td>
+      <td class="auto" rowspan="7" id="o_personal_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">배우자공제</td>
+      <td><input type="number" id="p_spouse"   oninput="calc()" value="0" min="0" max="1"></td>
+      <td class="unit-val">1,500,000</td><td></td>
+      <td class="auto" id="o_p_spouse">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">부양가족공제</td>
+      <td><input type="number" id="p_dep"      oninput="calc()" value="0" min="0"></td>
+      <td class="unit-val">1,500,000</td><td></td>
+      <td class="auto" id="o_p_dep">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2" rowspan="4">추가공제</td>
+      <td class="lbl3">경로우대공제</td>
+      <td><input type="number" id="p_elderly"  oninput="calc()" value="0" min="0"></td>
+      <td class="unit-val">1,000,000</td><td></td>
+      <td class="auto" id="o_p_elderly">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">장애인공제</td>
+      <td><input type="number" id="p_disabled" oninput="calc()" value="0" min="0"></td>
+      <td class="unit-val">2,000,000</td><td></td>
+      <td class="auto" id="o_p_disabled">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">부녀자공제</td>
+      <td><input type="number" id="p_woman"    oninput="calc()" value="0" min="0" max="1"></td>
+      <td class="unit-val">500,000</td><td></td>
+      <td class="auto" id="o_p_woman">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">한부모가족공제</td>
+      <td><input type="number" id="p_single"   oninput="calc()" value="0" min="0" max="1"></td>
+      <td class="unit-val">1,000,000</td><td></td>
+      <td class="auto" id="o_p_single">0</td>
+    </tr>
+
+    <!-- 연금보험료 (전액 공제) -->
+    <tr>
+      <td class="lbl" colspan="2">연금보험료</td>
+      <td class="lbl3">국민연금보험료</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_pension" oninput="calc()" placeholder="납입액 (전액 공제)"></td>
+      <td class="auto" id="o_d_pension">0</td>
+      <td class="auto" id="o_pension_total">0</td>
+    </tr>
+
+    <!-- 특별소득공제 보험료 (전액 공제) -->
+    <tr>
+      <td class="lbl" rowspan="5">특별소득공제</td>
+      <td class="lbl2" rowspan="2">보험료</td>
+      <td class="lbl3">국민건강보험료</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_health" oninput="calc()" placeholder="납입액 (전액 공제)"></td>
+      <td class="auto" id="o_d_health">0</td>
+      <td class="auto" rowspan="5" id="o_special_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">고용보험료</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_employ" oninput="calc()" placeholder="납입액 (전액 공제)"></td>
+      <td class="auto" id="o_d_employ">0</td>
+    </tr>
+
+    <!-- 주택자금 -->
+    <tr>
+      <td class="lbl2" rowspan="3">주택자금</td>
+      <td class="lbl3">청약저축 (×40%, 한도 240만)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_house1_in" oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_d_house1">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">주택임차차입금 (×40%, 한도 300만)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_house2_in" oninput="calc()" placeholder="원리금 상환액"></td>
+      <td class="auto" id="o_d_house2">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">장기주택차입금 (전액, 한도 600~2000만)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_house3_in" oninput="calc()" placeholder="이자 상환액"></td>
+      <td class="auto" id="o_d_house3">0</td>
+    </tr>
+
+    <!-- 기부금 이월분 (공제액 직접 입력) -->
+    <tr>
+      <td class="lbl" colspan="2">기부금</td>
+      <td class="lbl3">기부금 이월공제액</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_donation_cf" oninput="calc()" placeholder="이월된 공제액 직접 입력"></td>
+      <td class="auto" id="o_d_donation_cf">0</td>
+      <td class="auto" id="o_donation_cf_total">0</td>
+    </tr>
+
+    <!-- 기타공제 : 개인연금저축 (×40%, 한도 72만) -->
+    <tr>
+      <td class="lbl" colspan="2">기타공제</td>
+      <td class="lbl3">개인연금저축 (×40%, 한도 72만)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_priv_in" oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_d_priv">0</td>
+      <td class="auto" id="o_priv_total">0</td>
+    </tr>
+
+    <!-- 주택마련저축 (×40%, 납입한도 합산 300만, 총급여 7천만 이하만) -->
+    <tr>
+      <td class="lbl" colspan="2" rowspan="2">주택마련저축</td>
+      <td class="lbl3">주택청약저축 (×40%, 총급여 7천만↓)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_save1_in" oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_d_save1">0</td>
+      <td class="auto" rowspan="2" id="o_save_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">주택청약종합저축 (×40%, 총급여 7천만↓)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_save2_in" oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_d_save2">0</td>
+    </tr>
+
+    <!-- 신용카드 소득공제 (총급여 25% 초과분에 비율 적용) -->
+    <tr>
+      <td class="lbl" colspan="2" rowspan="6">신용카드<br>소득공제</td>
+      <td class="lbl3">신용카드 사용액 (15%)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_card_cc"    oninput="calc()" placeholder="연간 사용액"></td>
+      <td class="auto" id="o_d_card_cc">-</td>
+      <td class="auto" rowspan="6" id="o_card_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl3">직불·체크카드+현금영수증 (30%)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_card_dc"    oninput="calc()" placeholder="연간 사용액"></td>
+      <td class="auto" id="o_d_card_dc">-</td>
+    </tr>
+    <tr>
+      <td class="lbl3">전통시장+대중교통 (40%)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_card_mkt"   oninput="calc()" placeholder="연간 사용액"></td>
+      <td class="auto" id="o_d_card_mkt">-</td>
+    </tr>
+    <tr>
+      <td class="lbl3">도서·공연·박물관·영화 (40%, 총급여 7천만↓)</td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_card_cult"  oninput="calc()" placeholder="연간 사용액"></td>
+      <td class="auto" id="o_d_card_cult">-</td>
+    </tr>
+    <tr>
+      <td class="lbl3">수영장·체력단련장 (40%, 총급여 7천만↓) <span style="color:#e65100;font-size:10px;">★2025년 신설</span></td>
+      <td colspan="2"></td>
+      <td><input type="number" id="d_card_swim"  oninput="calc()" placeholder="연간 사용액"></td>
+      <td class="auto" id="o_d_card_swim">-</td>
+    </tr>
+    <tr>
+      <td class="lbl3" style="color:#1565c0; font-weight:bold;">→ 공제액 합계 (자동)</td>
+      <td colspan="2"></td>
+      <td class="auto" id="o_card_total2" style="font-weight:bold;">0</td>
+      <td></td>
+    </tr>
+
+    <!-- 합계 -->
+    <tr>
+      <td class="lbl sum" colspan="7" style="text-align:right; font-weight:bold;">소득공제 합계</td>
+      <td class="sum" id="o_ded_total">0</td>
+    </tr>
+  </table>
+
+  <!-- ======================== 과세표준 ======================== -->
+  <div class="sub-title">[ 근로소득과세표준 ]</div>
+  <table>
+    <colgroup><col style="width:30%"><col style="width:18%"><col style="width:18%"><col style="width:17%"><col style="width:17%"></colgroup>
+    <tr><th>구분</th><th>소득세율</th><th>누진공제</th><th>합계</th><th>총계</th></tr>
+    <tr><td class="lbl">근로소득과세표준 = 근로소득금액 − 소득공제합계</td><td></td><td></td><td class="auto" id="o_taxbase">0</td><td class="auto" id="o_taxbase2">0</td></tr>
+    <tr><td class="lbl">근로소득세율</td><td class="auto" id="o_taxrate">0%</td><td></td><td></td><td></td></tr>
+    <tr><td class="lbl">누진공제금액</td><td></td><td class="auto" id="o_progressive">0</td><td></td><td></td></tr>
+    <tr><td class="lbl" style="font-weight:bold;">근로소득산출세액</td><td></td><td></td><td class="auto" id="o_calc_tax">0</td><td class="auto" id="o_calc_tax2">0</td></tr>
+  </table>
+
+  <!-- ======================== 세액감면 ======================== -->
+  <div class="sub-title">[ 세액감면 ]</div>
+  <table>
+    <colgroup><col style="width:40%"><col style="width:36%"><col style="width:24%"></colgroup>
+    <tr><th>구분</th><th>금액</th><th>합계</th></tr>
+    <tr><td class="lbl">세액감면 합계</td><td><input type="number" id="tx_exempt" oninput="calc()" placeholder="0"></td><td class="auto" id="o_tx_exempt">0</td></tr>
+  </table>
+
+  <!-- ======================== 세액공제 ======================== -->
+  <div class="sub-title">[ 세액공제 ]</div>
+  <table>
+    <colgroup><col style="width:13%"><col style="width:27%"><col style="width:22%"><col style="width:15%"><col style="width:23%"></colgroup>
+    <tr><th>구분</th><th></th><th>공제대상/납입액</th><th>공제액</th><th>합계</th></tr>
+
+    <!-- 세액공제 -->
+    <tr>
+      <td class="lbl" rowspan="4">세액공제</td>
+      <td class="lbl2">근로소득세액공제 (자동 계산)</td>
+      <td></td><td></td>
+      <td class="auto" id="o_cr_emp">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">자녀세액공제 (자녀 수 입력)</td>
+      <td><input type="number" id="cr_child" oninput="calc()" value="0" min="0" placeholder="자녀수"></td>
+      <td class="auto" id="o_cr_child_amt">0</td>
+      <td class="auto" id="o_cr_child_t">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">출산·입양자세액공제 (인원 입력)</td>
+      <td><input type="number" id="cr_birth" oninput="calc()" value="0" min="0" placeholder="인원"></td>
+      <td class="auto" id="o_cr_birth_amt">0</td>
+      <td class="auto" id="o_cr_birth_t">0</td>
+    </tr>
+
+    <tr>
+      <td class="lbl2">결혼세액공제 (50만/인, 2024~2026 혼인신고, 생애 1회) <span style="color:#e65100;font-size:10px;">★2025년 신설</span></td>
+      <td><input type="number" id="cr_marriage" oninput="calc()" value="0" min="0" max="1" placeholder="본인 해당 시 1"></td>
+      <td class="auto" id="o_cr_marriage">0</td>
+      <td class="auto" id="o_cr_marriage_t">0</td>
+    </tr>
+
+    <!-- 연금계좌 -->
+    <tr>
+      <td class="lbl" rowspan="3">연금계좌</td>
+      <td class="lbl2">퇴직연금 (12% or 15%)</td>
+      <td><input type="number" id="cr_retire"     oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_cr_retire">0</td>
+      <td class="auto" rowspan="3" id="o_cr_pension_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">연금저축 (12% or 15%)</td>
+      <td><input type="number" id="cr_pension_sv" oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_cr_pension_sv">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">ISA연금계좌전환 (12% or 15%)</td>
+      <td><input type="number" id="cr_isa"        oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_cr_isa">0</td>
+    </tr>
+
+    <!-- 특별세액공제 -->
+    <tr>
+      <td class="lbl" rowspan="12">특별세액공제</td>
+      <td class="lbl2">보장성보험료 (12%, 한도 100만)</td>
+      <td><input type="number" id="cr_ins"         oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_cr_ins">0</td>
+      <td class="auto" rowspan="12" id="o_cr_special_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">장애인보장성보험료 (15%, 한도 100만)</td>
+      <td><input type="number" id="cr_ins_dis"     oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_cr_ins_dis">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">의료비 (총급여 3% 초과×15%)</td>
+      <td><input type="number" id="cr_medical"     oninput="calc()" placeholder="지출액"></td>
+      <td class="auto" id="o_cr_medical">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">교육비 (15%)</td>
+      <td><input type="number" id="cr_edu"         oninput="calc()" placeholder="납입액"></td>
+      <td class="auto" id="o_cr_edu">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">정치자금기부금 (10만 이하 전액)</td>
+      <td><input type="number" id="cr_pol1"        oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_cr_pol1">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">정치자금기부금 (10만 초과분 15~25%)</td>
+      <td><input type="number" id="cr_pol2"        oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_cr_pol2">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">고향사랑기부금 (10만 이하 전액)</td>
+      <td><input type="number" id="cr_home1"       oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_cr_home1">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">고향사랑기부금 (10만 초과 16.5%)</td>
+      <td><input type="number" id="cr_home2"       oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_cr_home2">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">일반기부금 (종교단체 외, 15%/30%, 소득 30% 한도)</td>
+      <td><input type="number" id="cr_don1"        oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_cr_don1">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">일반기부금 (종교단체, 15%/30%, 소득 10% 한도)</td>
+      <td><input type="number" id="cr_don2"        oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_cr_don2">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">월세 세액공제 (5,500만↓ 17% / 8,000만↓ 15%, 한도 1,000만)</td>
+      <td><input type="number" id="cr_rent"        oninput="calc()" placeholder="연간 월세액"></td>
+      <td class="auto" id="o_cr_rent">0</td>
+    </tr>
+
+    <tr>
+      <td class="lbl sum" colspan="4" style="text-align:right; font-weight:bold;">세액공제 총계</td>
+      <td class="sum" id="o_cr_total">0</td>
+    </tr>
+  </table>
+
+  <!-- ======================== 세액 ======================== -->
+  <div class="sub-title">[ 세액 ]</div>
+  <table>
+    <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+    <tr><th>구분</th><th>금액</th></tr>
+    <tr><td class="lbl" style="font-weight:bold;">결정세액 = 산출세액 − 세액감면 − 세액공제</td><td class="result-big" id="o_final_tax">0</td></tr>
+    <tr><td class="lbl">실효세율 = 결정세액 ÷ 총급여</td><td class="auto" id="o_eff_rate">0.00%</td></tr>
+  </table>
+
+  <!-- ======================== 결정세액 ======================== -->
+  <div class="sub-title">[ 결정세액 ]</div>
+  <table>
+    <colgroup><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>
+    <tr><th>구분</th><th>소득세</th><th>지방소득세</th><th>농어촌특별세</th><th>합계</th></tr>
+    <tr>
+      <td class="lbl">결정세액</td>
+      <td class="auto" id="o_dt_income">0</td>
+      <td class="auto" id="o_dt_local">0</td>
+      <td class="auto" id="o_dt_rural">0</td>
+      <td class="auto" id="o_dt_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl">기납부세액</td>
+      <td><input type="number" id="pre_income" oninput="calc()" placeholder="0"></td>
+      <td><input type="number" id="pre_local"  oninput="calc()" placeholder="0"></td>
+      <td><input type="number" id="pre_rural"  oninput="calc()" placeholder="0"></td>
+      <td class="auto" id="o_pre_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl sum" style="font-weight:bold;">차감징수세액</td>
+      <td class="sum" id="o_diff_income">0</td>
+      <td class="sum" id="o_diff_local">0</td>
+      <td class="sum" id="o_diff_rural">0</td>
+      <td class="sum" id="o_diff_total">0</td>
+    </tr>
+  </table>
+
+  <div class="note">
+    ※ 이 계산기는 참고용이며, 실제 신고 시 국세청 홈택스 또는 담당 세무사를 이용하시기 바랍니다.<br>
+    ※ 2025년 귀속 근로소득 기준 (소득세법 2025년 개정 적용, 2026년 신고)<br>
+    ※ 2025년 주요 개정: 자녀세액공제 2명 550만·셋째↑ 40만 / 출산공제 셋째↑ 70만 / 결혼세액공제 신설(50만) / 주택마련저축 납입한도 300만 / 도서·공연·수영장 공제율 40% / 수영장·체력단련장 공제 신설<br>
+    ※ 신용카드 공제: 총급여의 25% 초과 사용액에 대해 카드 유형별 공제율 적용. 한도: 총급여 7천만↓ 300만, 7천만~1.2억 250만, 1.2억↑ 200만 (전통시장·대중교통·도서공연·수영장 각 100만 추가)<br>
+    ※ 연금계좌 공제율: 총급여 5,500만↓ 15% / 5,500만↑ 12% ｜ 월세 세액공제: 5,500만↓ 17% / 8,000만↓ 15% / 8,000만↑ 미적용
+  </div>
+  </div><!-- /panel-yts -->
+
+  <!-- ══════════════════════════════════════════════════
+       탭 2: 종합소득세
+  ══════════════════════════════════════════════════ -->
+  <div id="panel-cit" class="tab-panel">
+  <div class="subtitle">2025년 귀속 종합소득세 기준 (2026년 신고) ｜ 노란색 칸에 값을 입력하면 자동으로 계산됩니다</div>
+  <div class="toolbar">
+    <button class="btn" onclick="resetCit()">초기화</button>
+    <button class="btn btn-primary" onclick="window.print()">인쇄 / PDF 저장</button>
+  </div>
+
+  <!-- ═════ 소득현황 ===== -->
+  <div class="section-title">[ 소득현황 ]</div>
+  <div class="hint">💡 금융소득(이자+배당) 합계 2천만원 이하는 분리과세(14%), 초과분만 종합과세됩니다. 근로소득은 총급여를 입력하면 근로소득공제가 자동 계산됩니다.</div>
+
+  <!-- 주택임대소득 설정 -->
+  <div class="sub-title">[ 주택임대소득 과세 방법 ]</div>
+  <table>
+    <colgroup><col style="width:20%"><col style="width:30%"><col style="width:20%"><col style="width:30%"></colgroup>
+    <tr>
+      <td class="lbl">과세 방법</td>
+      <td>
+        <select id="ci_rent1_sep" onchange="setRent1Sep(this.value)" style="width:100%;padding:3px;font-size:12px;font-family:inherit;background:#fffde7;border:1px solid #b0bec5;border-radius:2px;">
+          <option value="0">종합과세</option>
+          <option value="1">분리과세 (수입금액 2천만원↓만 가능)</option>
+        </select>
+      </td>
+      <td class="lbl">임대주택 등록 여부</td>
+      <td>
+        <select id="ci_rent1_reg" onchange="setRent1Reg(this.value)" style="width:100%;padding:3px;font-size:12px;font-family:inherit;background:#fffde7;border:1px solid #b0bec5;border-radius:2px;">
+          <option value="0">미등록 (필요경비 50%, 기본공제 200만)</option>
+          <option value="1">등록 (필요경비 60%, 기본공제 400만)</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl">주택임대 소득금액</td>
+      <td class="auto" id="co_rent1_income">0</td>
+      <td class="lbl">적용 기본공제액</td>
+      <td class="auto" id="co_rent1_basic_ded">0</td>
+    </tr>
+    <tr>
+      <td class="lbl">분리과세 과세표준</td>
+      <td class="auto" id="co_rent1_sep_base">0</td>
+      <td class="lbl">분리과세 세액 (14%)</td>
+      <td class="auto" id="co_rent1_sep_tax">0</td>
+    </tr>
+    <tr>
+      <td class="lbl" colspan="4" id="co_rent1_msg" style="color:#e65100;font-weight:normal;font-size:11px;text-align:left;"></td>
+    </tr>
+  </table>
+
+  <!-- 사무실/상가 임대소득 경비 설정 -->
+  <div class="sub-title">[ 사무실/상가 임대소득 경비 설정 ]</div>
+  <table>
+    <colgroup><col style="width:20%"><col style="width:30%"><col style="width:20%"><col style="width:30%"></colgroup>
+    <tr>
+      <td class="lbl">경비 방식</td>
+      <td>
+        <select id="ci_rent2_exp_type" onchange="setRent2ExpType(this.value)" style="width:100%;padding:3px;font-size:12px;font-family:inherit;background:#fffde7;border:1px solid #b0bec5;border-radius:2px;">
+          <option value="simple">단순경비율 42.6% (부동산 임대업 기준)</option>
+          <option value="direct">필요경비 직접 입력</option>
+        </select>
+      </td>
+      <td class="lbl">필요경비액</td>
+      <td>
+        <span class="auto" id="co_rent2_exp">0</span>
+        <span id="ci_rent2_exp_wrap" style="display:none;">
+          <input type="number" id="ci_rent2_exp_direct" oninput="setRent2DirectExp(this.value)" placeholder="0"
+            style="width:100%;padding:3px;font-size:12px;font-family:inherit;background:#fffde7;border:1px solid #b0bec5;border-radius:2px;">
+        </span>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl">소득금액 (수입 − 경비)</td>
+      <td class="auto" id="co_rent2_income">0</td>
+      <td class="lbl" style="color:#888;font-size:11px;">※ 수입금액은 위 소득현황 표에 입력</td>
+      <td></td>
+    </tr>
+  </table>
+
+  <table id="cit-table">
+    <colgroup>
+      <col style="width:9%">
+      <col style="width:11%">
+      <col style="width:9%">
+      <col style="width:9%">
+      <col style="width:9%">
+      <col style="width:10%">
+      <col style="width:10%">
+      <col style="width:9%">
+      <col style="width:9%">
+      <col style="width:10%">
+    </colgroup>
+    <tr>
+      <th rowspan="2">구분</th>
+      <th rowspan="2"></th>
+      <th colspan="2">금융소득</th>
+      <th colspan="2">사업소득</th>
+      <th rowspan="2">근로소득</th>
+      <th rowspan="2">연금소득</th>
+      <th rowspan="2">기타소득</th>
+      <th rowspan="2">합계</th>
+    </tr>
+    <tr>
+      <th>이자소득</th>
+      <th>배당소득</th>
+      <th>주택임대소득</th>
+      <th>사무실/상가<br>임대소득</th>
+    </tr>
+    <!-- 소득금액 입력 -->
+    <tr>
+      <td class="lbl" rowspan="2">소득금액</td>
+      <td class="lbl2">총액 (입력)</td>
+      <td><input type="number" id="ci_int"    oninput="calcCit()" placeholder="0"></td>
+      <td><input type="number" id="ci_div"    oninput="calcCit()" placeholder="0"></td>
+      <td><input type="number" id="ci_rent1"  oninput="calcCit()" placeholder="0"></td>
+      <td><input type="number" id="ci_rent2"  oninput="calcCit()" placeholder="0"></td>
+      <td><input type="number" id="ci_labor"  oninput="calcCit()" placeholder="총급여액"></td>
+      <td><input type="number" id="ci_penin"  oninput="calcCit()" placeholder="공적연금액"></td>
+      <td><input type="number" id="ci_other"  oninput="calcCit()" placeholder="수입금액"></td>
+      <td class="auto" id="co_gross_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">비과세금융소득 (-)</td>
+      <td><input type="number" id="ci_int_nt" oninput="calcCit()" placeholder="0"></td>
+      <td><input type="number" id="ci_div_nt" oninput="calcCit()" placeholder="0"></td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td>
+    </tr>
+    <!-- 합계 -->
+    <tr>
+      <td class="lbl">합계</td>
+      <td class="lbl2">금융소득금액</td>
+      <td class="auto" id="co_int_net">0</td>
+      <td class="auto" id="co_div_net">0</td>
+      <td class="auto" id="co_rent1_amt">0</td>
+      <td class="auto" id="co_rent2_amt">0</td>
+      <td class="auto" id="co_labor_sal">0</td>
+      <td class="auto" id="co_pension_in">0</td>
+      <td class="auto" id="co_other_net">0</td>
+      <td class="auto" id="co_income_total">0</td>
+    </tr>
+    <!-- 분리과세 -->
+    <tr>
+      <td class="lbl">분리과세</td>
+      <td class="lbl2" style="color:#e65100;">분리과세 적용금액 (14%)</td>
+      <td class="sep" id="co_sep_int">0</td>
+      <td class="sep" id="co_sep_div">0</td>
+      <td class="sep" id="co_sep_rent1">-</td>
+      <td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td><td class="dash">-</td>
+      <td class="sep" id="co_sep_total">0</td>
+    </tr>
+    <!-- 과세대상소득 -->
+    <tr>
+      <td class="lbl" colspan="2" style="font-weight:bold;">과세대상소득 (종합과세)</td>
+      <td class="auto" id="co_tax_int">0</td>
+      <td class="auto" id="co_tax_div">0</td>
+      <td class="auto" id="co_tax_rent1">0</td>
+      <td class="auto" id="co_tax_rent2">0</td>
+      <td class="auto" id="co_labor_income">0</td>
+      <td class="auto" id="co_pension_taxable">0</td>
+      <td class="auto" id="co_other_taxable">0</td>
+      <td class="sum" id="co_taxable_gross">0</td>
+    </tr>
+    <!-- 공제 -->
+    <tr>
+      <td class="lbl" rowspan="4">공제</td>
+      <td class="lbl2">근로소득공제 (자동)</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="auto" id="co_labor_ded">0</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="auto" id="co_labor_ded_t">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">인적공제 (기본·추가)</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td><input type="number" id="ci_personal_ded" oninput="calcCit()" placeholder="본인 150만 + 부양가족 등"></td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="auto" id="co_personal_ded_t">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">연금보험료공제 (국민연금 등)</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td><input type="number" id="ci_pension_ded" oninput="calcCit()" placeholder="납입액 전액 공제"></td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="auto" id="co_pension_ded_t">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">특별소득공제 (건강·고용보험료 등)</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td><input type="number" id="ci_special_ded" oninput="calcCit()" placeholder="납입액 전액 공제"></td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="auto" id="co_special_ded_t">0</td>
+    </tr>
+    <!-- 과세표준 -->
+    <tr>
+      <td class="lbl" colspan="2" style="font-weight:bold;">과세표준</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td><td class="dash">-</td>
+      <td class="sum" id="co_taxbase">0</td>
+    </tr>
+    <!-- 산출세액 -->
+    <tr>
+      <td class="lbl" colspan="2" style="font-weight:bold;">산출세액</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td><td class="dash">-</td>
+      <td class="sum" id="co_calc_tax">0</td>
+    </tr>
+    <!-- 세액공제 -->
+    <tr>
+      <td class="lbl" rowspan="3">세액공제</td>
+      <td class="lbl2">근로소득세액공제 (자동)</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="auto" id="co_emp_cr">0</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="auto" id="co_emp_cr_t">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">연금계좌세액공제 (한도 900만, 12%/15%)</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td><input type="number" id="ci_pension_cr" oninput="calcCit()" placeholder="납입액 입력"></td>
+      <td class="auto" id="co_pension_cr_t">0</td>
+    </tr>
+    <tr>
+      <td class="lbl2">특별세액공제 (보험·의료·교육 등)</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td><td class="dash">-</td>
+      <td><input type="number" id="ci_special_cr" oninput="calcCit()" placeholder="공제액 입력"></td>
+    </tr>
+    <!-- 결정세액 -->
+    <tr>
+      <td class="lbl" colspan="2" style="font-weight:bold; color:#c62828;">결정세액</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td>
+      <td class="dash">-</td><td class="dash">-</td><td class="dash">-</td>
+      <td class="final" id="co_final_tax">0</td>
+    </tr>
+  </table>
+
+  <!-- ═════ 세액 상세 ===== -->
+  <div class="section-title" style="margin-top:14px;">[ 세액 납부/환급 ]</div>
+  <table>
+    <colgroup><col style="width:30%"><col style="width:20%"><col style="width:20%"><col style="width:30%"></colgroup>
+    <tr><th>구분</th><th>소득세</th><th>지방소득세 (10%)</th><th>합계</th></tr>
+    <tr>
+      <td class="lbl" style="font-weight:bold;">결정세액</td>
+      <td class="auto" id="co_dt_income">0</td>
+      <td class="auto" id="co_dt_local">0</td>
+      <td class="auto" id="co_dt_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl">금융소득 분리과세 세액 (14%)</td>
+      <td class="auto" id="co_sep_tax">0</td>
+      <td class="auto" id="co_sep_tax_local">0</td>
+      <td class="auto" id="co_sep_tax_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl">주택임대 분리과세 세액 (14%)</td>
+      <td class="auto" id="co_rent1_sep_tax2">0</td>
+      <td class="auto" id="co_rent1_sep_tax_local">0</td>
+      <td class="auto" id="co_rent1_sep_tax_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl">기납부세액 (원천징수 등)</td>
+      <td><input type="number" id="ci_pre_income" oninput="calcCit()" placeholder="0"></td>
+      <td><input type="number" id="ci_pre_local"  oninput="calcCit()" placeholder="0"></td>
+      <td class="auto" id="co_pre_total">0</td>
+    </tr>
+    <tr>
+      <td class="lbl sum" style="font-weight:bold;">납부(▲환급)세액</td>
+      <td class="sum" id="co_diff_income">0</td>
+      <td class="sum" id="co_diff_local">0</td>
+      <td class="sum" id="co_diff_total">0</td>
+    </tr>
+  </table>
+
+  <div class="note">
+    ※ 이 계산기는 참고용이며, 실제 신고 시 국세청 홈택스 또는 담당 세무사를 이용하시기 바랍니다.<br>
+    ※ 2025년 귀속 종합소득세 기준 (소득세법 2025년 개정 적용, 2026년 신고)<br>
+    ※ 금융소득: 이자+배당 합계 2,000만원 초과 시 전액 종합과세. 이하 분리과세(14%, 별도 납부).<br>
+    ※ 주택임대소득: 수입금액 2,000만원 이하 → 분리과세(14%) 또는 종합과세 선택. 초과 → 무조건 종합과세. 등록 필요경비 60%·기본공제 400만 / 미등록 필요경비 50%·기본공제 200만. 주택임대 외 종합소득 2,000만원 초과 시 기본공제 미적용.<br>
+    ※ 기타소득: 수입금액의 60%를 필요경비로 차감한 금액(40%)이 과세소득. 기타소득금액 300만 이하 분리과세 선택 가능.<br>
+    ※ 연금소득: 공적연금 수령액 기준 입력. 연금소득공제는 추후 항목 추가 예정.<br>
+    ※ 연금계좌세액공제: 퇴직연금(IRP)·연금저축 납입액 기준, 한도 900만원. 총급여 5,500만(종합소득 4,500만)↓ 15%, 초과 12%.<br>
+    ※ 특별세액공제: 보험료·의료비·교육비 등 실제 공제액을 직접 입력.
+  </div>
+  </div><!-- /panel-cit -->
+
+</div><!-- /container -->
+
+<script>
+// ── 주택임대 설정값 전역 변수 (select onchange 타이밍 이슈 방지) ──
+let g_rent1Sep = 0;  // 0: 종합과세, 1: 분리과세
+let g_rent1Reg = 0;  // 0: 미등록,   1: 등록
+function setRent1Sep(val) { g_rent1Sep = parseInt(val) || 0; calcCit(); }
+function setRent1Reg(val) { g_rent1Reg = parseInt(val) || 0; calcCit(); }
+
+let g_rent2ExpType = 'simple'; // 'simple': 단순경비율 42.6%, 'direct': 직접입력
+let g_rent2DirectExp = 0;      // 직접입력 필요경비액
+function setRent2ExpType(val) {
+  g_rent2ExpType = val;
+  const wrap = document.getElementById('ci_rent2_exp_wrap');
+  if (wrap) wrap.style.display = val === 'direct' ? '' : 'none';
+  calcCit();
+}
+function setRent2DirectExp(val) { g_rent2DirectExp = parseInt(val) || 0; calcCit(); }
+
+// ── 탭 전환 ──────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── 유틸 ─────────────────────────────────────────────────
+function v(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+function fmt(n) { return Math.round(n).toLocaleString('ko-KR'); }
+function set(id, n)    { const el = document.getElementById(id); if (el) el.textContent = fmt(n); }
+function setTxt(id, t) { const el = document.getElementById(id); if (el) el.textContent = t; }
+
+// ── 근로소득공제 ──────────────────────────────────────────
+function empDed(sal) {
+  if (sal <= 5_000_000)   return sal * 0.70;
+  if (sal <= 15_000_000)  return 3_500_000  + (sal - 5_000_000)  * 0.40;
+  if (sal <= 45_000_000)  return 7_500_000  + (sal - 15_000_000) * 0.15;
+  if (sal <= 100_000_000) return 12_000_000 + (sal - 45_000_000) * 0.05;
+  return Math.min(14_750_000 + (sal - 100_000_000) * 0.02, 20_000_000);
+}
+
+// ── 세율·누진공제 ─────────────────────────────────────────
+function taxInfo(base) {
+  if (base <= 14_000_000)  return { rate: 0.06, prog: 0 };
+  if (base <= 50_000_000)  return { rate: 0.15, prog: 1_260_000 };
+  if (base <= 88_000_000)  return { rate: 0.24, prog: 5_760_000 };
+  if (base <= 150_000_000) return { rate: 0.35, prog: 15_440_000 };
+  if (base <= 300_000_000) return { rate: 0.38, prog: 19_940_000 };
+  if (base <= 500_000_000) return { rate: 0.40, prog: 25_940_000 };
+  if (base <= 1_000_000_000){ return { rate: 0.42, prog: 35_940_000 }; }
+  return { rate: 0.45, prog: 65_940_000 };
+}
+
+// ── 근로소득세액공제 (2025년 귀속) ───────────────────────
+function empTaxCredit(calcTax, totalSal) {
+  const credit = calcTax <= 1_300_000
+    ? calcTax * 0.55
+    : 715_000 + (calcTax - 1_300_000) * 0.30;
+  let limit;
+  if      (totalSal <= 55_000_000)  limit = 740_000;
+  else if (totalSal <= 70_000_000)  limit = Math.max(740_000 - Math.floor((totalSal - 55_000_000) / 10_000) * 80, 660_000);
+  else if (totalSal <= 120_000_000) limit = Math.max(660_000 - Math.floor((totalSal - 70_000_000) / 10_000) * 50, 500_000);
+  else                               limit = Math.max(500_000 - Math.floor((totalSal - 120_000_000) / 10_000) * 50, 200_000);
+  return Math.min(credit, limit);
+}
+
+// ── 자녀세액공제 (2025년 귀속) ───────────────────────────
+function childCredit(n) {
+  if (n <= 0) return 0;
+  if (n === 1) return 250_000;
+  if (n === 2) return 550_000;           // 2025년: 500,000→550,000
+  return 550_000 + (n - 2) * 400_000;   // 2025년: 셋째 이상 400,000
+}
+
+// ── 출산·입양 세액공제 (2025년 귀속) ─────────────────────
+function birthCredit(n) {
+  if (n <= 0) return 0;
+  if (n === 1) return 300_000;
+  if (n === 2) return 500_000;
+  return 700_000;   // 2025년: 셋째 이상 70만원 (고정)
+}
+
+// ── 의료비 세액공제 ──────────────────────────────────────
+function medicalCredit(amt, totalSal) {
+  return Math.min(Math.max(amt - totalSal * 0.03, 0), 7_000_000) * 0.15;
+}
+
+// ── 신용카드 소득공제 (2025년 귀속) ──────────────────────
+// 총급여의 25% 초과 사용액에 카드 유형별 공제율 적용
+// 공제율이 낮은 신용카드부터 threshold 소진
+function calcCardDed(cc, dc, mkt, cult, swim, totalSal) {
+  const threshold = totalSal * 0.25;
+  let remain = threshold;
+
+  // 1) 신용카드(15%) 먼저 threshold 소진
+  const cc_over  = Math.max(cc  - remain, 0); remain = Math.max(remain - cc,  0);
+  // 2) 직불/체크/현금(30%)
+  const dc_over  = Math.max(dc  - remain, 0); remain = Math.max(remain - dc,  0);
+  // 3) 전통시장+대중교통(40%)
+  const mkt_over = Math.max(mkt - remain, 0); remain = Math.max(remain - mkt, 0);
+  // 4) 도서/공연/박물관(40%, 총급여 7천만 이하) ← 2025년: 30%→40%
+  const cult_over = totalSal <= 70_000_000 ? Math.max(cult - remain, 0) : 0;
+                                               remain = Math.max(remain - cult, 0);
+  // 5) 수영장·체력단련장(40%, 총급여 7천만 이하) ← 2025년 신설
+  const swim_over = totalSal <= 70_000_000 ? Math.max(swim - remain, 0) : 0;
+
+  // 기본 공제액
+  const base_ded = cc_over * 0.15 + dc_over * 0.30 + mkt_over * 0.40
+                 + cult_over * 0.40 + swim_over * 0.40;   // 2025년: cult 30%→40%
+
+  // 기본 한도
+  let base_limit;
+  if      (totalSal <= 70_000_000)  base_limit = 3_000_000;
+  else if (totalSal <= 120_000_000) base_limit = 2_500_000;
+  else                               base_limit = 2_000_000;
+
+  // 추가 한도 (전통시장+대중교통 100만, 도서/공연 100만, 수영장 100만 각각 추가)
+  const extra_mkt  = Math.min(mkt_over  * 0.40, 1_000_000);
+  const extra_cult = Math.min(cult_over * 0.40, 1_000_000);   // 2025년: 40%
+  const extra_swim = Math.min(swim_over * 0.40, 1_000_000);   // 2025년 신설
+
+  const total_limit = base_limit + extra_mkt + extra_cult + extra_swim;
+  return Math.min(base_ded, total_limit);
+}
+
+// ── 차감징수세액 표시 ────────────────────────────────────
+function setDiff(id, n) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = (n < 0 ? '▲ ' : '') + fmt(Math.abs(n));
+  el.style.color = n < 0 ? '#1565c0' : '#c62828';
+}
+
+// ═════════════════════════════════════════════════════════
+//  메인 계산 함수
+// ═════════════════════════════════════════════════════════
+function calc() {
+  // ── 소득현황 ──
+  const sM=v('s_main'), sP1=v('s_prev1'), sP2=v('s_prev2');
+  const bM=v('b_main'), bP1=v('b_prev1'), bP2=v('b_prev2');
+  const salSum = sM+sP1+sP2, bonSum = bM+bP1+bP2;
+  set('o_salary_sum', salSum); set('o_bonus_sum', bonSum);
+  set('o_col_main', sM+bM); set('o_col_prev1', sP1+bP1); set('o_col_prev2', sP2+bP2);
+  const incomeGrand = salSum + bonSum;
+  set('o_income_grand', incomeGrand);
+
+  // ── 비과세 ──
+  const ntKeys = ['research','overseas','night','birth','foreign','invention','meal','other'];
+  let ntTotal = 0;
+  ntKeys.forEach(k => { const a = v('nt_'+k); set('o_nt_'+k, a); ntTotal += a; });
+  set('o_nt_sub', ntTotal); set('o_nt_total', ntTotal);
+
+  // ── 근로소득 (비과세 차감) ──
+  const totalSal = Math.max(incomeGrand - ntTotal, 0);
+  const ded = empDed(totalSal);
+  const empIncome = Math.max(totalSal - ded, 0);
+  set('o_total_salary', totalSal);  set('o_total_salary2', totalSal);
+  set('o_emp_ded', ded);            set('o_emp_ded2', ded);
+  set('o_emp_income', empIncome);   set('o_emp_income2', empIncome);
+
+  // ── 소득공제 계산 ──
+
+  // 인적공제
+  const pSelf   = Math.min(v('p_self'),1)*1_500_000;
+  const pSpouse = Math.min(v('p_spouse'),1)*1_500_000;
+  const pDep    = Math.max(v('p_dep'),0)*1_500_000;
+  const pElder  = Math.max(v('p_elderly'),0)*1_000_000;
+  const pDis    = Math.max(v('p_disabled'),0)*2_000_000;
+  const pWoman  = Math.min(v('p_woman'),1)*500_000;
+  const pSingle = Math.min(v('p_single'),1)*1_000_000;
+  set('o_p_self',pSelf); set('o_p_spouse',pSpouse); set('o_p_dep',pDep);
+  set('o_p_elderly',pElder); set('o_p_disabled',pDis);
+  set('o_p_woman',pWoman); set('o_p_single',pSingle);
+  const personalTotal = pSelf+pSpouse+pDep+pElder+pDis+pWoman+pSingle;
+  set('o_personal_total', personalTotal);
+
+  // 연금보험료 (전액 공제)
+  const dPension = v('d_pension');
+  set('o_d_pension', dPension); set('o_pension_total', dPension);
+
+  // 특별소득공제 보험료 (전액 공제)
+  const dHealth = v('d_health'), dEmploy = v('d_employ');
+  set('o_d_health', dHealth); set('o_d_employ', dEmploy);
+
+  // 주택자금 공제 계산
+  // 청약저축: 납입액 × 40%, 납입 한도 300만원 (총급여 7천만 이하만) ← 2025년: 240만→300만
+  const house1In = v('d_house1_in');
+  const dHouse1 = totalSal <= 70_000_000 ? Math.min(house1In, 3_000_000) * 0.4 : 0;
+  set('o_d_house1', dHouse1);
+
+  // 주택임차차입금: 납입액(원리금 상환액) × 40%, 한도 300만원
+  const house2In = v('d_house2_in');
+  const dHouse2 = Math.min(house2In * 0.4, 3_000_000);
+  set('o_d_house2', dHouse2);
+
+  // 장기주택차입금: 이자 상환액 전액 (한도는 대출 조건별 상이 → 직접 입력값 상한 없이 적용)
+  const dHouse3 = v('d_house3_in');
+  set('o_d_house3', dHouse3);
+
+  const specialTotal = dHealth + dEmploy + dHouse1 + dHouse2 + dHouse3;
+  set('o_special_total', specialTotal);
+
+  // 기부금 이월분 (공제액 직접 입력)
+  const dDonCf = v('d_donation_cf');
+  set('o_d_donation_cf', dDonCf); set('o_donation_cf_total', dDonCf);
+
+  // 기타공제: 개인연금저축 납입액 × 40%, 한도 72만원
+  const privIn = v('d_priv_in');
+  const dPriv = Math.min(privIn * 0.4, 720_000);
+  set('o_d_priv', dPriv); set('o_priv_total', dPriv);
+
+  // 주택마련저축: 청약저축+종합저축 납입액 합산 × 40%, 납입 한도 300만원 (총급여 7천만 이하) ← 2025년: 240만→300만
+  const save1In = v('d_save1_in'), save2In = v('d_save2_in');
+  const saveTotalIn = save1In + save2In;
+  const saveTotalDed = totalSal <= 70_000_000 ? Math.min(saveTotalIn, 3_000_000) * 0.4 : 0;
+  // 두 항목 비례 배분
+  const dSave1 = saveTotalIn > 0 ? saveTotalDed * (save1In / saveTotalIn) : 0;
+  const dSave2 = saveTotalIn > 0 ? saveTotalDed * (save2In / saveTotalIn) : 0;
+  set('o_d_save1', dSave1); set('o_d_save2', dSave2);
+  set('o_save_total', saveTotalDed);
+
+  // 신용카드 소득공제 (유형별 계산) ← 2025년: swim 추가, cult 40%
+  const cc = v('d_card_cc'), dc = v('d_card_dc'), mkt = v('d_card_mkt'), cult = v('d_card_cult'), swim = v('d_card_swim');
+  const cardTotal = calcCardDed(cc, dc, mkt, cult, swim, totalSal);
+  // 각 항목별 참고 공제액 표시 (정확한 배분은 복잡하므로 공제액 합계만 표시)
+  setTxt('o_d_card_cc',   cc   > 0 ? '계산에 포함됨' : '-');
+  setTxt('o_d_card_dc',   dc   > 0 ? '계산에 포함됨' : '-');
+  setTxt('o_d_card_mkt',  mkt  > 0 ? '계산에 포함됨' : '-');
+  setTxt('o_d_card_cult', cult > 0 ? (totalSal <= 70_000_000 ? '계산에 포함됨' : '총급여 7천만 초과 미적용') : '-');
+  setTxt('o_d_card_swim', swim > 0 ? (totalSal <= 70_000_000 ? '계산에 포함됨' : '총급여 7천만 초과 미적용') : '-');
+  set('o_card_total',  cardTotal);
+  set('o_card_total2', cardTotal);
+
+  // 소득공제 합계
+  const dedTotal = personalTotal + dPension + specialTotal + dDonCf + dPriv + saveTotalDed + cardTotal;
+  set('o_ded_total', dedTotal);
+
+  // ── 과세표준 ──
+  const taxBase = Math.max(empIncome - dedTotal, 0);
+  const { rate, prog } = taxInfo(taxBase);
+  const calcTax = Math.max(taxBase * rate - prog, 0);
+  set('o_taxbase', taxBase); set('o_taxbase2', taxBase);
+  setTxt('o_taxrate', (rate * 100).toFixed(2) + '%');
+  set('o_progressive', prog);
+  set('o_calc_tax', calcTax); set('o_calc_tax2', calcTax);
+
+  // ── 세액감면 ──
+  const txExempt = v('tx_exempt');
+  set('o_tx_exempt', txExempt);
+
+  // ── 세액공제 ──
+  const crEmp   = empTaxCredit(calcTax, totalSal);
+  set('o_cr_emp', crEmp);
+
+  const childN  = Math.max(v('cr_child'), 0);
+  const crChild = childCredit(childN);
+  set('o_cr_child_amt', crChild); set('o_cr_child_t', crChild);
+
+  const birthN  = Math.max(v('cr_birth'), 0);
+  const crBirth = birthCredit(birthN);
+  set('o_cr_birth_amt', crBirth); set('o_cr_birth_t', crBirth);
+
+  // 결혼세액공제 (2025년 신설): 본인 해당 시 50만원, 생애 1회
+  const crMarriage = Math.min(v('cr_marriage'), 1) * 500_000;
+  set('o_cr_marriage', crMarriage); set('o_cr_marriage_t', crMarriage);
+
+  // 연금계좌 (총급여 5,500만 이하 15%, 초과 12%)
+  const pensionRate = totalSal <= 55_000_000 ? 0.15 : 0.12;
+  const retireIn    = v('cr_retire');
+  const penSvIn     = v('cr_pension_sv');
+  const isaIn       = v('cr_isa');
+  const crRetire    = Math.min(retireIn, 9_000_000) * pensionRate;
+  const crPenSv     = Math.min(penSvIn, Math.max(0, 9_000_000 - retireIn)) * pensionRate;
+  const crIsa       = Math.min(isaIn * 0.75, 3_000_000) * pensionRate;
+  set('o_cr_retire', crRetire); set('o_cr_pension_sv', crPenSv); set('o_cr_isa', crIsa);
+  set('o_cr_pension_total', crRetire + crPenSv + crIsa);
+
+  // 특별세액공제
+  const crIns    = Math.min(v('cr_ins'),     1_000_000) * 0.12;
+  const crInsDis = Math.min(v('cr_ins_dis'), 1_000_000) * 0.15;
+  const crMed    = medicalCredit(v('cr_medical'), totalSal);
+  const crEdu    = v('cr_edu') * 0.15;
+  const crPol1   = Math.min(v('cr_pol1'), 100_000);
+  const pol2     = v('cr_pol2');
+  const crPol2   = pol2 <= 30_000_000 ? pol2 * 0.15 : pol2 * 0.25;
+  const crHome1  = Math.min(v('cr_home1'), 100_000);
+  const crHome2  = v('cr_home2') * 0.165;
+  // 일반기부금 세액공제: 1천만원 이하 15%, 초과분 30%
+  // 한도: 종교단체 외 → 근로소득금액의 30%, 종교단체 → 근로소득금액의 10%
+  function donationCredit(amount, incomeLimit) {
+    const deductible = Math.min(amount, incomeLimit);
+    return deductible <= 10_000_000
+      ? deductible * 0.15
+      : 10_000_000 * 0.15 + (deductible - 10_000_000) * 0.30;
+  }
+  const crDon1 = donationCredit(v('cr_don1'), empIncome * 0.30);  // 종교단체 외, 소득 30% 한도
+  const crDon2 = donationCredit(v('cr_don2'), empIncome * 0.10);  // 종교단체,    소득 10% 한도
+  // 월세 세액공제 (2025년 귀속): 총급여 5,500만↓ 17%, 5,500만~8,000만↓ 15%, 8,000만↑ 미적용, 한도 1,000만
+  let crRent = 0;
+  if (totalSal <= 55_000_000)       crRent = Math.min(v('cr_rent'), 10_000_000) * 0.17;
+  else if (totalSal <= 80_000_000)  crRent = Math.min(v('cr_rent'), 10_000_000) * 0.15;
+  // 총급여 8,000만 초과: 0
+  set('o_cr_rent', crRent);
+
+  set('o_cr_ins',crIns); set('o_cr_ins_dis',crInsDis); set('o_cr_medical',crMed);
+  set('o_cr_edu',crEdu); set('o_cr_pol1',crPol1); set('o_cr_pol2',crPol2);
+  set('o_cr_home1',crHome1); set('o_cr_home2',crHome2);
+  set('o_cr_don1',crDon1); set('o_cr_don2',crDon2);
+  const specialCr = crIns+crInsDis+crMed+crEdu+crPol1+crPol2+crHome1+crHome2+crDon1+crDon2+crRent;
+  set('o_cr_special_total', specialCr);
+
+  const crTotal = crEmp + crChild + crBirth + crMarriage + (crRetire+crPenSv+crIsa) + specialCr;
+  set('o_cr_total', crTotal);
+
+  // ── 결정세액 ──
+  const finalTax = Math.max(calcTax - txExempt - crTotal, 0);
+  set('o_final_tax', finalTax);
+  setTxt('o_eff_rate', (totalSal > 0 ? (finalTax/totalSal*100) : 0).toFixed(2) + '%');
+
+  // 지방소득세 (소득세의 10%)
+  const dtIncome = finalTax;
+  const dtLocal  = Math.floor(finalTax * 0.1);
+  const dtTotal  = dtIncome + dtLocal;
+  set('o_dt_income',dtIncome); set('o_dt_local',dtLocal);
+  set('o_dt_rural',0);         set('o_dt_total',dtTotal);
+
+  // 기납부세액 및 차감징수세액
+  const preIn=v('pre_income'), preLo=v('pre_local'), preRu=v('pre_rural');
+  set('o_pre_total', preIn+preLo+preRu);
+  setDiff('o_diff_income', dtIncome - preIn);
+  setDiff('o_diff_local',  dtLocal  - preLo);
+  setDiff('o_diff_rural',  0        - preRu);
+  setDiff('o_diff_total',  dtTotal  - (preIn+preLo+preRu));
+}
+
+function resetAll() {
+  if (!confirm('연말정산 탭의 모든 입력값을 초기화하시겠습니까?')) return;
+  document.querySelectorAll('#panel-yts input[type="number"]').forEach(el => {
+    el.value = (el.id === 'p_self') ? '1' : '';
+  });
+  calc();
+}
+
+// ═════════════════════════════════════════════════════════
+//  종합소득세 계산 함수
+// ═════════════════════════════════════════════════════════
+function calcCit() {
+  const ci  = id => parseFloat(document.getElementById(id)?.value) || 0;
+  const cs  = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = fmt(Math.round(n)); };
+  const csd = (id, n) => {
+    const el = document.getElementById(id); if (!el) return;
+    el.textContent = (n < 0 ? '▲ ' : '') + fmt(Math.abs(Math.round(n)));
+    el.style.color = n < 0 ? '#1565c0' : '#c62828';
+  };
+
+  // ── 소득 입력값 ──
+  const int_    = ci('ci_int');
+  const div_    = ci('ci_div');
+  const intNt   = ci('ci_int_nt');
+  const divNt   = ci('ci_div_nt');
+  const rent1   = ci('ci_rent1');
+  const rent2   = ci('ci_rent2');
+  const laborSal = ci('ci_labor');
+  const pensionIn = ci('ci_penin');
+  const otherGross = ci('ci_other');
+
+  // ── 금융소득 처리 ──
+  const intNet  = Math.max(int_ - intNt, 0);
+  const divNet  = Math.max(div_ - divNt, 0);
+  const finTotal = intNet + divNet;
+
+  // 분리과세 (2천만↓): 비율 배분
+  const finSep  = Math.min(finTotal, 20_000_000);
+  const finOver = Math.max(finTotal - 20_000_000, 0); // 종합과세 금융소득
+  const ratio   = finTotal > 0 ? finSep / finTotal : 0;
+  const sepInt  = intNet * ratio;
+  const sepDiv  = divNet * ratio;
+  const taxInt  = intNet - sepInt;
+  const taxDiv  = divNet - sepDiv;
+
+  cs('co_int_net', intNet);   cs('co_div_net', divNet);
+  cs('co_sep_int', sepInt);   cs('co_sep_div', sepDiv);
+  cs('co_sep_total', finSep);
+  cs('co_tax_int', taxInt);   cs('co_tax_div', taxDiv);
+
+  // ── 선계산 (주택임대 기본공제 판단에 필요) ──
+  const laborDed    = empDed(laborSal);
+  const laborIncome = Math.max(laborSal - laborDed, 0);
+  const otherNet    = otherGross * 0.40;
+
+  // 사무실/상가 임대소득 필요경비 선계산
+  const rent2Exp = g_rent2ExpType === 'simple'
+    ? Math.round(rent2 * 0.426)
+    : Math.min(g_rent2DirectExp, rent2);
+  const rent2Income = Math.max(rent2 - rent2Exp, 0);
+
+  // ── 주택임대소득 분리과세/종합과세 처리 ──
+  const rent1SepSel = g_rent1Sep === 1; // 분리과세 선택 (전역변수)
+  const rent1RegSel = g_rent1Reg === 1; // 등록임대 (전역변수)
+  const rent1ExpRate   = rent1RegSel ? 0.60 : 0.50;          // 필요경비율
+  const rent1BasicDedMax = rent1RegSel ? 4_000_000 : 2_000_000; // 기본공제 한도
+  const rent1Income    = Math.max(rent1 * (1 - rent1ExpRate), 0); // 소득금액 (필요경비 차감)
+
+  // 수입금액 2천만 초과 → 무조건 종합과세
+  const rent1ForceTax  = rent1 > 20_000_000;
+  const rent1ActualSep = !rent1ForceTax && rent1SepSel;
+
+  // 분리과세 기본공제: 주택임대 외 종합소득금액이 2천만원 초과 시 0원
+  // (다른 소득은 금융과세분 + 사업소득rent2 + 근로소득금액 + 연금 + 기타)
+  // → 이 시점엔 taxInt/taxDiv/laborIncome 등이 아직 계산됨 (순서 주의: 위에서 먼저 계산됨)
+  const otherIncomeForBD = taxInt + taxDiv + rent2Income + laborIncome + pensionIn + otherNet;
+  const rent1BasicDed  = otherIncomeForBD > 20_000_000 ? 0 : rent1BasicDedMax;
+  const rent1SepBase   = Math.max(rent1Income - rent1BasicDed, 0);
+  const rent1SepTax    = rent1ActualSep ? Math.round(rent1SepBase * 0.14) : 0;
+
+  // 메시지
+  const msgEl = document.getElementById('co_rent1_msg');
+  if (msgEl) {
+    if (rent1 === 0) msgEl.textContent = '';
+    else if (rent1ForceTax) msgEl.textContent = '⚠ 수입금액 2천만원 초과 → 무조건 종합과세 적용';
+    else if (rent1ActualSep) msgEl.textContent = `✔ 분리과세 선택됨 (필요경비 ${(rent1ExpRate*100).toFixed(0)}%, 기본공제 ${rent1BasicDed.toLocaleString()}원)`;
+    else msgEl.textContent = `✔ 종합과세 선택됨 (필요경비 ${(rent1ExpRate*100).toFixed(0)}% 차감 후 소득금액 ${Math.round(rent1Income).toLocaleString()}원)`;
+  }
+
+  // 주택임대소득 표시
+  const rent1TaxIncome = rent1ActualSep ? 0 : rent1Income; // 종합과세 포함 금액
+  const rent1SepAmt    = rent1ActualSep ? rent1 : 0;       // 분리과세 금액 (수입금액 기준)
+  cs('co_rent1_amt', rent1);
+  cs('co_rent1_income', rent1Income);
+  cs('co_rent1_basic_ded', rent1ActualSep ? rent1BasicDed : 0);
+  cs('co_rent1_sep_base', rent1ActualSep ? rent1SepBase : 0);
+  cs('co_rent1_sep_tax', rent1SepTax);
+  // 분리과세 행
+  const sepRent1El = document.getElementById('co_sep_rent1');
+  if (sepRent1El) {
+    sepRent1El.textContent = rent1ActualSep ? Math.round(rent1).toLocaleString('ko-KR') : '-';
+  }
+  cs('co_tax_rent1', rent1TaxIncome);
+
+  // ── 사무실/상가 임대소득 (사업소득) — 필요경비 차감 (rent2Exp, rent2Income은 위에서 선계산) ──
+  cs('co_rent2_amt', rent2);
+  cs('co_rent2_exp', rent2Exp);
+  cs('co_rent2_income', rent2Income);
+  cs('co_tax_rent2', rent2Income);
+
+  // ── 근로소득 (laborDed, laborIncome은 위에서 선계산) ──
+  cs('co_labor_sal', laborSal);
+  cs('co_labor_ded', laborDed);  cs('co_labor_ded_t', laborDed);
+  cs('co_labor_income', laborIncome);
+
+  // ── 연금소득 (간이: 공적연금 입력값 그대로 적용, 연금소득공제는 추후 추가 예정) ──
+  cs('co_pension_in', pensionIn);
+  cs('co_pension_taxable', pensionIn);
+
+  // ── 기타소득 (필요경비 60% 차감 → 40%만 과세, otherNet은 위에서 선계산) ──
+  cs('co_other_net', otherNet);
+  cs('co_other_taxable', otherNet);
+
+  // ── 합계 ──
+  const grossTotal  = int_ + div_ + rent1 + rent2 + laborSal + pensionIn + otherGross;
+  const incomeTotal = intNet + divNet + rent1 + rent2Income + laborSal + pensionIn + otherNet;
+  cs('co_gross_total', grossTotal);
+  cs('co_income_total', incomeTotal);
+  // 분리과세 합계: 금융소득 + 주택임대 분리과세
+  const sepTotalAmt = finSep + rent1SepAmt;
+  const sepTotalEl = document.getElementById('co_sep_total');
+  if (sepTotalEl) sepTotalEl.textContent = fmt(sepTotalAmt);
+
+  // 과세대상소득 합계 (분리과세 제외 + 근로소득공제 차감 후)
+  // rent1은 분리과세 시 rent1TaxIncome=0, 종합과세 시 rent1Income(필요경비차감 후)
+  const taxableGross = taxInt + taxDiv + rent1TaxIncome + rent2Income + laborIncome + pensionIn + otherNet;
+  cs('co_taxable_gross', taxableGross);
+
+  // ── 소득공제 ──
+  const personalDed = ci('ci_personal_ded');   // 인적공제
+  const pensionDed  = ci('ci_pension_ded');    // 연금보험료공제
+  const specialDed  = ci('ci_special_ded');    // 특별소득공제
+  cs('co_personal_ded_t', personalDed);
+  cs('co_pension_ded_t',  pensionDed);
+  cs('co_special_ded_t',  specialDed);
+  const incDed = personalDed + pensionDed + specialDed;
+
+  // ── 과세표준 ──
+  const taxBase = Math.max(taxableGross - incDed, 0);
+  cs('co_taxbase', taxBase);
+
+  // ── 산출세액 ──
+  const { rate, prog } = taxInfo(taxBase);   // 기존 함수 재사용
+  const calcTax = Math.max(taxBase * rate - prog, 0);
+  cs('co_calc_tax', calcTax);
+
+  // ── 세액공제 ──
+  // 근로소득세액공제: 근로소득 있는 경우 자동 계산
+  const empCr = laborSal > 0 ? empTaxCredit(calcTax, laborSal) : 0;
+  cs('co_emp_cr', empCr);  cs('co_emp_cr_t', empCr);
+
+  // 연금계좌세액공제: 한도 900만, 종합소득금액 4,500만(총급여 5,500만) 이하 15%, 초과 12%
+  const penAccRate  = laborSal > 0
+    ? (laborSal <= 55_000_000 ? 0.15 : 0.12)
+    : (taxableGross <= 45_000_000 ? 0.15 : 0.12);
+  const pensionCrIn = ci('ci_pension_cr');
+  const pensionCr   = Math.min(pensionCrIn, 9_000_000) * penAccRate;
+  cs('co_pension_cr_t', pensionCr);
+
+  // 특별세액공제: 공제액 직접 입력 (보험료·의료비·교육비 합산)
+  const specialCr = ci('ci_special_cr');
+
+  const totalCr = empCr + pensionCr + specialCr;
+
+  // ── 결정세액 ──
+  const finalTax = Math.max(calcTax - totalCr, 0);
+  csd('co_final_tax', finalTax);
+
+  // ── 세액 납부/환급 테이블 ──
+  const dtIncome    = finalTax;
+  const dtLocal     = Math.floor(finalTax * 0.1);
+  const dtTotal     = dtIncome + dtLocal;
+  const sepTax         = Math.round(finSep * 0.14);       // 금융소득 분리과세 세액
+  const sepTaxLocal    = Math.floor(sepTax * 0.1);
+  const rent1SepTaxLocal = Math.floor(rent1SepTax * 0.1); // 주택임대 분리과세 지방세
+  cs('co_dt_income', dtIncome);  cs('co_dt_local', dtLocal);  cs('co_dt_total', dtTotal);
+  cs('co_sep_tax', sepTax);  cs('co_sep_tax_local', sepTaxLocal);  cs('co_sep_tax_total', sepTax + sepTaxLocal);
+  cs('co_rent1_sep_tax2', rent1SepTax);
+  cs('co_rent1_sep_tax_local', rent1SepTaxLocal);
+  cs('co_rent1_sep_tax_total', rent1SepTax + rent1SepTaxLocal);
+
+  const preIn  = ci('ci_pre_income');
+  const preLo  = ci('ci_pre_local');
+  cs('co_pre_total', preIn + preLo);
+  csd('co_diff_income', dtIncome - preIn);
+  csd('co_diff_local',  dtLocal  - preLo);
+  csd('co_diff_total',  dtTotal  - (preIn + preLo));
+}
+
+function resetCit() {
+  if (!confirm('종합소득세 탭의 모든 입력값을 초기화하시겠습니까?')) return;
+  document.querySelectorAll('#panel-cit input[type="number"]').forEach(el => { el.value = ''; });
+  calcCit();
+}
+
+calc();
+calcCit();
+</script>
+</body>
+</html>
