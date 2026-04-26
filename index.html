@@ -5,88 +5,245 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>소득세 계산기 (연말정산 / 종합소득세)</title>
 <style>
+  /* ── 기본 ── */
   * { box-sizing: border-box; }
   body {
-    font-family: 'Malgun Gothic', '맑은 고딕', AppleGothic, Arial, sans-serif;
-    font-size: 12px;
-    background: #eef2f7;
+    font-family: 'Malgun Gothic', '맑은 고딕', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12.5px;
+    background: #f0f4fa;
     margin: 0;
-    padding: 16px;
-    color: #222;
+    padding: 0;
+    color: #1e293b;
   }
-  .container {
-    max-width: 900px;
-    margin: 0 auto;
+
+  /* ── 상단 헤더 ── */
+  .site-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    padding: 28px 24px 22px;
+    text-align: center;
+    color: #fff;
+  }
+  .site-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 6px;
+    letter-spacing: -0.5px;
+  }
+  .site-header .header-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+    margin: 0 0 14px;
+  }
+  .site-header .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 11px;
+    color: #e0f0ff;
+  }
+
+  /* ── 탭 네비게이션 ── */
+  .tab-wrap {
     background: #fff;
-    border: 1px solid #b0bec5;
-    border-radius: 6px;
-    padding: 20px 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    padding: 0 24px;
   }
-  h1 { text-align: center; font-size: 15px; font-weight: bold; margin: 0 0 4px; color: #1a237e; }
-  .subtitle { text-align: center; font-size: 11px; color: #666; margin-bottom: 14px; }
-  .toolbar { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 12px; }
-  .btn { padding: 5px 14px; border: 1px solid #90a4ae; border-radius: 4px; background: #f5f5f5; cursor: pointer; font-size: 12px; font-family: inherit; color: #333; }
-  .btn:hover { background: #e0e0e0; }
-  .btn-primary { background: #1565c0; color: white; border-color: #0d47a1; }
-  .btn-primary:hover { background: #0d47a1; }
+  .tab-btn {
+    padding: 14px 32px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #64748b;
+    font-family: inherit;
+    transition: all 0.18s;
+    margin-bottom: -1px;
+  }
+  .tab-btn.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+  .tab-btn:hover:not(.active) { color: #334155; background: #f8fafc; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 
-  .section-title { background: #1565c0; color: #fff; padding: 5px 10px; font-weight: bold; margin: 16px 0 4px; font-size: 12px; border-radius: 2px; }
-  .sub-title { background: #bbdefb; color: #0d2a6e; padding: 4px 10px; font-weight: bold; margin: 8px 0 2px; font-size: 12px; border-left: 3px solid #1565c0; }
-  .hint { font-size: 10.5px; color: #b71c1c; background: #fff8e1; border: 1px solid #ffe082; padding: 3px 8px; margin-bottom: 3px; border-radius: 3px; }
+  /* ── 컨테이너 ── */
+  .container {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+  }
 
-  table { width: 100%; border-collapse: collapse; margin-bottom: 2px; font-size: 12px; }
-  th { background: #e3f2fd; border: 1px solid #90caf9; padding: 4px 6px; text-align: center; font-weight: bold; color: #1a237e; white-space: nowrap; }
-  td { border: 1px solid #b0bec5; padding: 3px 5px; text-align: center; vertical-align: middle; }
-  td.lbl  { text-align: left; background: #f3f7fc; white-space: nowrap; }
-  td.lbl2 { text-align: left; background: #f8fbff; padding-left: 14px; white-space: nowrap; }
-  td.lbl3 { text-align: left; background: #fcfeff; padding-left: 26px; white-space: nowrap; }
-  td.rate { text-align: center; background: #f1f8e9; color: #33691e; font-size: 11px; white-space: nowrap; }
-  td.auto { background: #e8f5e9; text-align: right; font-weight: bold; color: #1b5e20; white-space: nowrap; }
-  td.sum  { background: #fff8e1; text-align: right; font-weight: bold; color: #e65100; white-space: nowrap; }
-  td.unit-val { background: #f9fbe7; text-align: right; color: #555; white-space: nowrap; }
-  td.result-big { background: #e8f5e9; text-align: right; font-weight: bold; color: #1b5e20; font-size: 13px; }
+  /* ── 패널 서브타이틀 ── */
+  .subtitle {
+    text-align: center;
+    font-size: 12px;
+    color: #64748b;
+    margin: 0 0 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
 
+  /* ── 툴바 ── */
+  .toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 16px; }
+  .btn {
+    padding: 7px 18px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-family: inherit;
+    color: #475569;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+  .btn-primary {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+  }
+  .btn-primary:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); box-shadow: 0 3px 10px rgba(37,99,235,0.4); }
+
+  /* ── 섹션 타이틀 ── */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+    color: #fff;
+    padding: 8px 14px;
+    font-weight: 700;
+    font-size: 13px;
+    margin: 24px 0 6px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(37,99,235,0.2);
+  }
+  .sub-title {
+    background: #eff6ff;
+    color: #1e40af;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: 12px;
+    margin: 10px 0 3px;
+    border-left: 4px solid #3b82f6;
+    border-radius: 0 6px 6px 0;
+  }
+  .hint {
+    font-size: 11px;
+    color: #92400e;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    padding: 5px 10px;
+    margin-bottom: 4px;
+    border-radius: 6px;
+  }
+
+  /* ── 테이블 ── */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 3px; font-size: 12px; }
+  th {
+    background: #dbeafe;
+    border: 1px solid #bfdbfe;
+    padding: 6px 8px;
+    text-align: center;
+    font-weight: 700;
+    color: #1e3a8a;
+    white-space: nowrap;
+    font-size: 11.5px;
+  }
+  td { border: 1px solid #e2e8f0; padding: 4px 6px; text-align: center; vertical-align: middle; }
+  td.lbl  { text-align: left; background: #f8fafc; white-space: nowrap; color: #374151; font-weight: 500; }
+  td.lbl2 { text-align: left; background: #f8fafc; padding-left: 16px; white-space: nowrap; color: #4b5563; }
+  td.lbl3 { text-align: left; background: #fafafa; padding-left: 28px; white-space: nowrap; color: #6b7280; }
+  td.rate { text-align: center; background: #f0fdf4; color: #166534; font-size: 11px; white-space: nowrap; }
+  td.auto { background: #f0fdf4; text-align: right; font-weight: 700; color: #15803d; white-space: nowrap; }
+  td.sum  { background: #fff7ed; text-align: right; font-weight: 700; color: #c2410c; white-space: nowrap; }
+  td.unit-val { background: #fafaf9; text-align: right; color: #6b7280; white-space: nowrap; }
+  td.result-big { background: #f0fdf4; text-align: right; font-weight: 700; color: #15803d; font-size: 14px; }
+
+  /* ── 입력 필드 ── */
   input[type="number"] {
-    width: 100%; border: 1px solid #b0bec5; padding: 2px 5px;
-    text-align: right; font-size: 12px; font-family: inherit;
-    background: #fffde7; border-radius: 2px; outline: none;
+    width: 100%;
+    border: 1.5px solid #e2e8f0;
+    padding: 3px 7px;
+    text-align: right;
+    font-size: 12px;
+    font-family: inherit;
+    background: #fefce8;
+    border-radius: 5px;
+    outline: none;
     -moz-appearance: textfield;
+    transition: border-color 0.15s, background 0.15s;
   }
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  input[type="number"]:focus { border-color: #1565c0; background: #e8eaf6; }
+  input[type="number"]:focus { border-color: #3b82f6; background: #eff6ff; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
 
-  .note { font-size: 10.5px; color: #777; margin-top: 14px; line-height: 1.7; border-top: 1px solid #e0e0e0; padding-top: 8px; }
+  select {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 5px;
+    background: #fefce8;
+    font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  select:focus { border-color: #3b82f6; outline: none; }
 
-  /* ── 탭 ── */
-  .tab-nav { display: flex; gap: 3px; margin: 10px 0 0; border-bottom: 2px solid #1565c0; }
-  .tab-btn { padding: 7px 22px; background: #e3f2fd; border: 1px solid #90caf9; border-bottom: none; cursor: pointer; font-size: 13px; font-weight: bold; color: #1565c0; border-radius: 5px 5px 0 0; font-family: inherit; transition: background 0.15s; }
-  .tab-btn.active { background: #1565c0; color: #fff; border-color: #1565c0; }
-  .tab-btn:hover:not(.active) { background: #bbdefb; }
-  .tab-panel { display: none; padding-top: 14px; }
-  .tab-panel.active { display: block; }
+  /* ── 주석 ── */
+  .note {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 20px;
+    line-height: 1.8;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 12px;
+  }
 
   /* ── 종합소득세 matrix 테이블 ── */
-  #cit-table td.dash { background: #f5f5f5; color: #bbb; text-align: center; }
-  #cit-table td.sep  { background: #fff3e0; text-align: right; font-weight: bold; color: #e65100; }
-  #cit-table td.final { background: #fce4ec; text-align: right; font-weight: bold; font-size: 13px; }
+  #cit-table td.dash { background: #f8fafc; color: #cbd5e1; text-align: center; }
+  #cit-table td.sep  { background: #fff7ed; text-align: right; font-weight: 700; color: #c2410c; }
+  #cit-table td.final { background: #fdf4ff; text-align: right; font-weight: 700; font-size: 13px; color: #7e22ce; }
+
+  /* ── 카드 래퍼 (선택적) ── */
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
 
   @media print {
-    body { background: white; padding: 0; }
-    .container { border: none; box-shadow: none; padding: 8px; }
+    .site-header { background: #1e3a8a !important; -webkit-print-color-adjust: exact; }
+    body { background: white; }
+    .container { padding: 8px; }
     .toolbar, .hint { display: none; }
     input[type="number"] { border: none; background: transparent; }
   }
 </style>
 </head>
 <body>
+<div class="site-header">
+  <h1>🧾 소득세 계산기</h1>
+  <p class="header-sub">연말정산 · 종합소득세 자동 계산</p>
+  <span class="badge">📅 2025년 귀속 · 2026년 최신 세법 기준</span>
+</div>
+
+<div class="tab-wrap">
+  <button class="tab-btn active" onclick="switchTab('yts',this)">📋 연말정산</button>
+  <button class="tab-btn" onclick="switchTab('cit',this)">📊 종합소득세</button>
+</div>
+
 <div class="container">
-  <h1>소득세 계산기</h1>
-  <div class="tab-nav">
-    <button class="tab-btn active" onclick="switchTab('yts',this)">📋 연말정산</button>
-    <button class="tab-btn" onclick="switchTab('cit',this)">📊 종합소득세</button>
-  </div>
 
   <!-- ══════════════════════════════════════════════════
        탭 1: 연말정산
